@@ -39,7 +39,7 @@ Sample input pipe:
       },
       "test": {
         "type": "embedded",
-        "entities": [{}]
+        "entities": [{<test_data>}]
       }
     },
     "condition": "$ENV(current-env)"

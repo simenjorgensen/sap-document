@@ -8,7 +8,7 @@ import requests
 from collections import OrderedDict
 
 app = Flask(__name__)
-logger = logger.Logger("json-translator-service")
+logger = logger.Logger("sap")
 
 # parse xml and return an ordered dictionary
 

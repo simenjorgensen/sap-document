@@ -50,13 +50,7 @@ Sample input pipe:
       "default": [
         ["add", "_id", "ID"],
         ["add", "composite_id", "_id"],
-        ["copy", "*"],
-        ["add", "rdf:type",
-          ["ni", "sap", "document"]
-        ],
-        ["add", "system_name", "sap"],
-        ["add", "view", "doc_view"],
-        ["add", "type_key", "_S.type_key"]
+        ["copy", "*"]
       ]
     }
   }

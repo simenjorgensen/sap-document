@@ -18,11 +18,15 @@ def parsejson(jsonfile):
 
 
 def process_entity(entity):
-    entity["id"] = entity["__metadata"]["id"]
-    entity["type"] = entity["__metadata"]["type"]
-    entity["uri"] = entity["__metadata"]["uri"]
-    entity = remove_namespacing(entity)
-    return entity
+    entity = json.loads(json.dumps(entity))
+    new_dict = {}
+    for k, v in entity.items():
+        if k.startswith("_"):
+            new_dict[k.split("_")[-1]] = v
+        else:
+            new_dict[k] = v
+    new_dict = remove_namespacing(new_dict)
+    return new_dict
 
 
 def remove_namespacing(entity):

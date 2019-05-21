@@ -9,7 +9,7 @@ from collections import OrderedDict
 import cherrypy
 
 app = Flask(__name__)
-logger = logger.Logger("sap")
+logger = logger.Logger("<System_name>")
 
 # parse json and return an ordered dictionary
 
@@ -19,18 +19,6 @@ def parsejson(jsonfile):
 
 
 def process_entity(entity):
-    entity = json.loads(json.dumps(entity))
-    new_dict = {}
-    for k, v in entity.items():
-        if k.startswith("_"):
-            new_dict[k.split("_")[-1]] = v
-        else:
-            new_dict[k] = v
-    new_dict = remove_namespacing(new_dict)
-    return new_dict
-
-
-def prosses_material_entity(entity):
     entity = json.loads(json.dumps(entity))
     new_dict = {}
     for k, v in entity.items():
@@ -91,7 +79,8 @@ class DataAccess:
             raise AssertionError(
                 "Unexpected response status code: %d with response text %s" % (req.status_code, req.text))
         for entity in Dotdictify(parsejson(req.text))[root_key][element_key]:
-            if entity["Charact"] == "PCS_GROUP":
+            #filter
+            if entity["<key>"] == "<value>":
                 yield process_entity(entity)
 
     def get_material_json(self, path, args):
@@ -128,12 +117,16 @@ def get_url():
     if not isinstance(entities, list):
         entities = [entities]
     for entity in entities:
-            for k, v in entity.items():
-                    if k == "url":
-                        return Response(
-                            stream_json(data_access_layer.get_material_json(v, request.args)),
-                            mimetype='application/json'
-                        )
+        for k, v in entity.items():
+            if k != os.environ.get("url_path"):
+                logger.error("Unexpected variable name: %s" % k)
+                raise AssertionError(
+                    "Unexpected variable name: %s" % k)
+            if k == os.environ.get("url_path"):
+                return Response(
+                    stream_json(data_access_layer.get_material_json(v, request.args)),
+                    mimetype='application/json'
+                )
 
 
 @app.route("/<path:path>", methods=["GET"])
@@ -160,6 +153,10 @@ if __name__ == '__main__':
     # Start the CherryPy WSGI web server
     cherrypy.engine.start()
     cherrypy.engine.block()
+
+
+
+
 
 
 

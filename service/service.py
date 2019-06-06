@@ -9,7 +9,7 @@ from collections import OrderedDict
 import cherrypy
 
 app = Flask(__name__)
-logger = logger.Logger("<System_name>")
+logger = logger.Logger("sap")
 
 # parse json and return an ordered dictionary
 
@@ -18,16 +18,34 @@ def parsejson(jsonfile):
     return json.loads(jsonfile, object_pairs_hook=OrderedDict)
 
 
-def process_entity(entity):
+def remove_leading_underscore(entity):
     entity = json.loads(json.dumps(entity))
-    new_dict = {}
+    corr_dict = {}
+    for k, v in entity.items():
+        if isinstance(v, dict):
+            if k.startswith("_"):
+                corr_dict[k.split("_")[-1]] = v
+            else:
+                remove_leading_underscore(v)
+        else:
+            if k.startswith("_"):
+                corr_dict[k.split("_")[-1]] = v
+            else:
+                corr_dict[k] = v
+    corr_dict = remove_namespacing(corr_dict)
+    return corr_dict
+
+
+def process_material_entity(entity):
+    entity = json.loads(json.dumps(entity))
+    corr_dict = {}
     for k, v in entity.items():
         if k.startswith("_"):
-            new_dict[k.split("_")[-1]] = v
+            corr_dict[k.split("_")[-1]] = v
         else:
-            new_dict[k] = v
-    new_dict = remove_namespacing(new_dict)
-    return new_dict
+            corr_dict[k] = v
+    corr_dict = remove_namespacing(corr_dict)
+    return corr_dict
 
 
 def remove_namespacing(entity):
@@ -51,17 +69,32 @@ class DataAccess:
     def __get_all_json(self, path, args):
         url = os.environ.get("url") + path
         username = os.environ.get("username")
-        key = os.environ.get("key")
+        password = os.environ.get("password")
         logger.info("URL+PATH: %s", url)
         root_key = os.environ.get("root_key")
         element_key = os.environ.get("element_key")
-        req = requests.get(url, auth=HTTPBasicAuth(username, key), verify=False, params=args)
+        req = requests.get(url, auth=HTTPBasicAuth(username, password), verify=False, params=args)
         if req.status_code != 200:
             logger.error("Unexpected response status code: %d with response text %s" % (req.status_code, req.text))
             raise AssertionError(
                 "Unexpected response status code: %d with response text %s" % (req.status_code, req.text))
-        for entity in Dotdictify(parsejson(req.text))[root_key][element_key]:
-            yield process_entity(entity)
+
+        cleaned_dictionary = Dotdictify(parsejson(req.text))[root_key][element_key]
+        deduplicated_dictionary = {}
+
+        for entity in cleaned_dictionary:
+            entity["_id"] = entity["Dokar"] + "_" + "101670" + "_" + entity["Doknr"] + "_" + entity["Dokob"] + "_" + entity["Doktl"] + "_" + entity["Mandt"]
+            entity["composite_id"] = entity["_id"]
+            entity["metadata"] = entity["__metadata"]
+            if entity["_id"] not in deduplicated_dictionary:
+                deduplicated_dictionary[entity["_id"]] = entity
+            else:
+                entity_version = entity["Dokvr"]
+                if entity_version > deduplicated_dictionary[entity["_id"]]["Dokvr"]:
+                    deduplicated_dictionary[entity["_id"]] = entity
+
+        for k, v in deduplicated_dictionary.items():
+            yield remove_leading_underscore(v)
 
     def get_json(self, path, args):
         return self.__get_all_json(path, args)
@@ -69,19 +102,18 @@ class DataAccess:
     def __get_all_material_json(self, path, args):
         url = os.environ.get("url") + path
         username = os.environ.get("username")
-        key = os.environ.get("key")
+        password = os.environ.get("password")
         logger.info("URL+PATH: %s", url)
         root_key = os.environ.get("root_key")
         element_key = os.environ.get("element_key")
-        req = requests.get(url, auth=HTTPBasicAuth(username, key), verify=False, params=args)
+        req = requests.get(url, auth=HTTPBasicAuth(username, password), verify=False, params=args)
         if req.status_code != 200:
             logger.error("Unexpected response status code: %d with response text %s" % (req.status_code, req.text))
             raise AssertionError(
                 "Unexpected response status code: %d with response text %s" % (req.status_code, req.text))
         for entity in Dotdictify(parsejson(req.text))[root_key][element_key]:
-            #filter
-            if entity["<key>"] == "<value>":
-                yield process_entity(entity)
+            if entity[<"filter_key">] == <"filter_value">:
+                yield process_material_entity(entity)
 
     def get_material_json(self, path, args):
         return self.__get_all_material_json(path, args)
@@ -105,10 +137,10 @@ def stream_json(clean):
 @app.route("/file/<path:path>", methods=["GET"])
 def get_file(path):
     username = os.environ.get("username")
-    key = os.environ.get("key")
+    password = os.environ.get("password")
     url = os.environ.get("url") + path
     args = request.args
-    return requests.get(url, auth=HTTPBasicAuth(username, key), verify=False, params=args).content
+    return requests.get(url, auth=HTTPBasicAuth(username, password), verify=False, params=args).content
 
 
 @app.route("/material", methods=["POST"])
@@ -153,12 +185,6 @@ if __name__ == '__main__':
     # Start the CherryPy WSGI web server
     cherrypy.engine.start()
     cherrypy.engine.block()
-
-
-
-
-
-
 
 
 
